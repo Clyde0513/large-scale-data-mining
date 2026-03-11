@@ -134,9 +134,7 @@ Based on the 1k→42% result, the expected gains from scaling up are:
 #### Question 7: Data Scaling Results
 
 | Training Examples | Val Accuracy (100-Q subset) |
-
 |--- | --- |
-
 | 0 (base model) | 37% |
 | 1,000 | 42% |
 | 3,000 | 46% |
