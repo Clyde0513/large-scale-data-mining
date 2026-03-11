@@ -1,16 +1,18 @@
 # Project 3 Report
+
 **Student:** Clyde Villacrusis (305965764)  
 **Course:** ECE 219 — Large-Scale Data Mining  
 
 ---
 
-## Part A — Fine-Tuning Language Models for Mathematical Reasoning (GSM8K)
+## Part A: Fine-Tuning Language Models for Mathematical Reasoning (GSM8K)
 
 ---
+gt p
+### Task 1: Baseline: How Good is the Base Model?
 
-### Task 1 — Baseline: How Good is the Base Model?
 
-#### Question 1 — Base Model Zero-Shot Accuracy *(10 pts)*
+#### Question 1 — Base Model Zero-Shot Accuracy
 
 The base `Qwen2.5-1.5B-Instruct` model was evaluated on 100 GSM8K test questions using batched inference (batch size = 16), a standardized system prompt, and a `\boxed{...}` answer-extraction rule.
 
@@ -18,25 +20,24 @@ The base `Qwen2.5-1.5B-Instruct` model was evaluated on 100 GSM8K test questions
 
 ---
 
-#### Question 2 — Three Failure Examples from the Base Model *(10 pts)*
+#### Question 2: Three Failure Examples from the Base Model 
 
 Three random incorrect examples were sampled from the base model's outputs. All failures involve arithmetic errors despite correct problem setup.
 
 ---
 
-**Example 1 — Sandcastle levels (expected: 60)**
-
+**Example 1: Sandcastle levels (expected: 60)**
 > *"Each level has half the square footage as the level below it. Top level = 16 sq ft. What is the average square footage of a level in a 4-level sandcastle?"*
 
 The model correctly identified levels: 16, 8, 4, 2.  
 It then incorrectly computed the total: `16 + 8 + 4 + 2 = 20` (should be 30), and computed an average of 5.  
 **Predicted: 5 | Ground truth: 60**
 
-> **Failure type:** Simple addition error AND directional logic error — the problem states each *upper* level is half the one *below* it, so the sequence going bottom-to-top should be 128, 64, 32, 16, giving a total of 240 and an average of 60. The model also went the wrong direction (top-down halving instead of bottom-up doubling).
+> **Failure type:** Simple addition error AND directional logic error: the problem states each *upper* level is half the one *below* it, so the sequence going bottom-to-top should be 128, 64, 32, 16, giving a total of 240 and an average of 60. The model also went the wrong direction (top-down halving instead of bottom-up doubling).
 
 ---
 
-**Example 2 — Combined weights (expected: 623)**
+**Example 2: Combined weights (expected: 623)**
 
 > *"Grace weighs 125 lbs. Alex weighs 2 lbs less than 4 times Grace's weight. What are their combined weights?"*
 
@@ -52,16 +53,16 @@ It then added: `125 + 498 = 613` (off-by-ten arithmetic error; correct is 623).
 
 > *"Regular rate = $10/hr for first 40 hrs. Overtime = 1.2× regular. She worked 45 hrs. Total earnings?"*
 
-The model incorrectly deduced that overtime hours = `5 − 40 = 0` (treating them as subtracted rather than surplus hours), then computed `$400 + $0 = $400`.  
-**Predicted: 400 | Ground truth: 460**
+The model incorrectly deduced that overtime hours = `12 * 5 = 10` (mistake in the multiplication), then computed `$400 + $10 = $410`.  
+**Predicted: 410 | Ground truth: 460**
 
 > **Failure type:** Fundamental misunderstanding of "overtime" — the model failed to compute that 45 − 40 = 5 overtime hours exist, and incorrectly derived 0 overtime hours.
 
 ---
 
-### Task 2 — LoRA Supervised Fine-Tuning
+### Task 2: LoRA Supervised Fine-Tuning
 
-#### Question 3 — Hyperparameter Analysis *(15 pts)*
+#### Question 3: Hyperparameter Analysis
 
 Three key hyperparameters from the training configuration:
 
@@ -91,7 +92,7 @@ Three key hyperparameters from the training configuration:
 
 ---
 
-#### Question 4 — LoRA Parameter Counts *(15 pts)*
+#### Question 4: LoRA Parameter Counts 
 
 **(a) Total parameters in base model:** **~1.54 billion** parameters
 
@@ -106,7 +107,7 @@ This tiny fraction (~700× reduction versus full fine-tuning) is achieved by two
 
 ---
 
-#### Question 5 — LoRA SFT with 1,000 Examples *(25 pts)*
+#### Question 5: LoRA SFT with 1,000 Examples 
 
 Configuration: LoRA (r=8, alpha=16, dropout=0.05), 1 epoch, learning rate = 2×10⁻⁴, cosine LR schedule, effective batch size = 32 (8 per device × 4 accumulation steps).
 
@@ -119,49 +120,51 @@ Configuration: LoRA (r=8, alpha=16, dropout=0.05), 1 epoch, learning rate = 2×1
 
 ---
 
-#### Question 6 — Scaling Prediction *(5 pts)*
+#### Question 6: Scaling Predictions
 
 Based on the 1k→42% result, the expected gains from scaling up are:
 
-- **1k → 3k examples:** Estimated +3 to +7 percentage points (landing in the low 60s). More problem templates reduce overfitting to the small 1k subset.  
-- **3k → full 7,473 examples:** Smaller gains, perhaps +2 to +4 points, due to limited adapter capacity and single-epoch training.
+- **1k to 3k examples:** Estimated +3 to +7 percentage points (landing in the low 60s). More problem templates reduce overfitting to the small 1k subset.  
+- **3k to full 7,473 examples:** Smaller gains, perhaps +2 to +4 points, due to limited adapter capacity and single-epoch training.
 
 **Strategy:** Scale in steps. Train on 3k first; if improvement ≥ 3–4 points, it is worth training on the full dataset. If the gain is marginal, focus on improving prompt quality or supervision signal rather than simply adding data.
 
 ---
 
-#### Question 7 — Data Scaling Results
+#### Question 7: Data Scaling Results
 
 | Training Examples | Val Accuracy (100-Q subset) |
-|---|---|
+
+|--- | --- |
+
 | 0 (base model) | 37% |
 | 1,000 | 42% |
-| 3,000 | 46–52% |
+| 3,000 | 46% |
 
 **Trend:** SFT clearly helps relative to the base model, but gains do not scale monotonically under fixed hyperparameters. One explanation is that the 1k run may mildly overfit to patterns in the 100-question evaluation subset, while the 3k run, trained for more steps at the same learning rate, may start overfitting to noise in the additional data. This is consistent with the idea of **diminishing returns in straightforward SFT**: once the adapter learns the general solution style, more heterogeneous data does not automatically improve accuracy unless hyperparameters or data quality are also improved.
 
 ---
 
-### Task 3 — K-Shot Prompting
+### Task 3: K-Shot Prompting
 
-#### Question 8 — Base vs. SFT on the Three Failure Examples *(10 pts)*
+#### Question 8: Base vs. SFT on the Three Failure Examples 
 
 The same three failure examples from Q2 were re-evaluated with the base model and the LoRA SFT (1k) model side-by-side.
 
 ---
 
-**Example 1 — Sandcastle (GT: 60)**
+**Example 1: Sandcastle (GT: 60)**
 
 | Model | Output Summary | Predicted | Correct? |
 |---|---|---|---|
 | Base | Computes 16+8+4+2=20, average = 5 | 5 | No |
-| SFT (1k) | Correctly doubles upward (16→32→64→128), total = 232, average = 58 | 58 | No (close) |
+| SFT (1k) | Correctly doubles upward (16+32+64+128), total = 232, average = 58 | 58 | No (close) |
 
 > The SFT model fixed the directionality error but got the arithmetic slightly off (232/4 = 58 vs GT 60 = 240/4).
 
 ---
 
-**Example 2 — Combined weights (GT: 623)**
+**Example 2: Combined weights (GT: 623)**
 
 | Model | Output Summary | Predicted | Correct? |
 |---|---|---|---|
@@ -172,7 +175,7 @@ The same three failure examples from Q2 were re-evaluated with the base model an
 
 ---
 
-**Example 3 — Overtime pay (GT: 460)**
+**Example 3: Overtime pay (GT: 460)**
 
 | Model | Output Summary | Predicted | Correct? |
 |---|---|---|---|
@@ -183,7 +186,7 @@ The same three failure examples from Q2 were re-evaluated with the base model an
 
 ---
 
-#### Question 9 — Recurring Error Patterns After SFT *(5 pts)*
+#### Question 9: Recurring Error Patterns After SFT
 
 After SFT, some arithmetic errors are reduced but the following failure modes persist:
 
@@ -193,7 +196,7 @@ After SFT, some arithmetic errors are reduced but the following failure modes pe
 
 ---
 
-#### Question 10 — K-Shot Prompting Results (k = 3) *(20 pts)*
+#### Question 10: K-Shot Prompting Results (k = 3)
 
 Three GSM8K training demonstrations (same for all questions, both models) were used as k-shot examples prepended in the system prompt.
 
@@ -206,7 +209,7 @@ Three GSM8K training demonstrations (same for all questions, both models) were u
 
 ---
 
-#### Question 11 — Analysis of Few-Shot Prompting *(10 pts)*
+#### Question 11: Analysis of Few-Shot Prompting 
 
 **Does few-shot prompting help the base model?**
 
@@ -218,13 +221,13 @@ Yes, but more modestly (+4 pp, from 52% to 56%). Since the SFT model already lea
 
 **Which model benefits most from few-shot prompting, and why?**
 
-The **base model** benefits more. The demonstrations give the base model information it never saw during training — concrete examples of multi-step reasoning on GSM8K-style problems — so performance improves substantially. For the SFT model, the reasoning style is already internalized; few-shot prompting mostly smooths out edge cases with diminishing marginal returns.
+The **base model** benefits more. The demonstrations give the base model information it never saw during training concrete examples of multi-step reasoning on GSM8K-style problems so performance improves substantially. For the SFT model, the reasoning style is already internalized; few-shot prompting mostly smooths out edge cases with diminishing marginal returns.
 
 ---
 
-### Task 4 — Beyond Scaling: Quality Matters
+### Task 4: Beyond Scaling: Quality Matters
 
-#### Question 12 — Qualitative Reflection on Performance Limits *(15 pts)*
+#### Question 12: Qualitative Reflection on Performance Limits
 
 After evaluating multiple model configurations across Tasks 1–3, five recurring failure categories were identified:
 
@@ -232,7 +235,7 @@ After evaluating multiple model configurations across Tasks 1–3, five recurrin
 Even when problem setup and multi-step reasoning are correct, the base model slips on simple arithmetic (e.g., `16 + 8 + 4 + 2 = 20`, `12 × 5 = 10`). After SFT, some of these errors are reduced and wrong answers move closer to correct values, but arithmetic noise persists in a non-trivial fraction of cases.
 
 **2. Multi-Step Planning Drift**  
-The base model often sets up Step 1 correctly but drifts in later steps — applying the wrong operation, forgetting intermediate variables, or reusing them incorrectly. LoRA SFT substantially improves reasoning structure, but the model still occasionally skips justifying the last computation step.
+The base model often sets up Step 1 correctly but drifts in later steps, applying the wrong operation, forgetting intermediate variables, or reusing them incorrectly. LoRA SFT substantially improves reasoning structure, but the model still occasionally skips justifying the last computation step.
 
 **3. Problem Comprehension**  
 The model generally parses questions correctly (identifies entities, target quantity, relevant numbers). SFT reduces comprehension errors further. However, when a misunderstanding occurs (usually in more complex phrasing), the entire reasoning chain is wrong from the start.
@@ -245,9 +248,9 @@ GSM8K solutions are human-written, diverse, and stylistically inconsistent. The 
 
 ---
 
-### Task 5 — Open Challenge: Push Toward the Ceiling
+### Task 5: Open Challenge: Push Toward the Ceiling
 
-#### Question 13 — Self-Consistency Inference *(15 pts)*
+#### Question 13: Self-Consistency Inference 
 
 **(a) Hypothesis**
 
@@ -258,7 +261,7 @@ Adding inference-time **self-consistency** (majority vote from multiple sampled 
 - Starting model: LoRA SFT (1k and 3k examples), same 100-question test subset.  
 - At inference time: k=3 few-shot demonstrations prepended to the system prompt.  
 - Self-consistency: For each question, sample **K = 5 or 10** solutions using `do_sample=True`, `temperature=0.7`, `top_p=0.9`.  
-- Final prediction: **majority vote** over extracted integer answers from all K samples. Ties or all-None → incorrect.
+- Final prediction: **majority vote** over extracted integer answers from all K samples. Ties or all-None --> incorrect.
 
 **(c) Results**
 
@@ -278,7 +281,7 @@ Results strongly support the hypothesis. Moving from greedy decoding (52%) to 3-
 
 Observations:
 - Increasing K from 3 to 5 gave a noticeable improvement; further increases likely yield diminishing returns relative to extra compute.  
-- Arithmetic and local-reasoning noise identified in Q12 is specifically addressed by self-consistency — diverse samples "average out" random slips.  
+- Arithmetic and local-reasoning noise identified in Q12 is specifically addressed by self-consistency: diverse samples "average out" random slips.  
 - Remaining errors tend to be "structural" (wrong problem interpretation from the start), which requires better supervision or data quality rather than more sampling.
 
 > **Overall conclusion from Task 5:** Inference-time self-consistency is a powerful, training-free complement to LoRA SFT. It specifically targets the arithmetic noise that persists after fine-tuning and achieves large gains at the cost of K× more inference compute.
@@ -287,13 +290,13 @@ Observations:
 
 ---
 
-## Part B — Agentic Data Mining with ReAct
+## Part B: Agentic Data Mining with ReAct
 
 ---
 
-### Task 1 — Load and Inspect JSONL Files
+### Task 1: Load and Inspect JSONL Files
 
-#### Question 14 — Dataset Statistics and Schema *(5 pts)*
+#### Question 14 — Dataset Statistics and Schema
 
 The `da-dev-questions.jsonl` and `da-dev-labels.jsonl` files were loaded and inspected.
 
@@ -326,7 +329,7 @@ The `da-dev-questions.jsonl` and `da-dev-labels.jsonl` files were loaded and ins
 
 ---
 
-#### Question 15 — Three Random Question Inspections *(5 pts)*
+#### Question 15: Three Random Question Inspections 
 
 Three questions were sampled at random (seed=0) and their referenced CSVs were loaded.
 
@@ -356,7 +359,7 @@ Three questions were sampled at random (seed=0) and their referenced CSVs were l
 
 ---
 
-#### Question 16 — Multi-Part Answer Format Analysis *(5 pts)*
+#### Question 16: Multi-Part Answer Format Analysis 
 
 **How the dataset represents multi-part answers:**
 
@@ -378,7 +381,7 @@ In the labels JSONL, the `common_answers` field is a list of two-element lists. 
 
 ---
 
-#### Question 17 — Inspecting the 10 Solvable Tasks *(5 pts)*
+#### Question 17: Inspecting the 10 Solvable Tasks 
 
 The 10 selected IDs: `[0, 5, 9, 10, 14, 18, 24, 25, 26, 55]`
 
@@ -386,9 +389,9 @@ Each record was printed showing the CSV file name, required output format, and q
 
 ---
 
-### Task 2 — Model Loading and Structured Output
+### Task 2: Model Loading and Structured Output
 
-#### Question 18 — Planner Structured Output Demonstration *(10 pts)*
+#### Question 18: Planner Structured Output Demonstration 
 
 A `PlannerOutput` Pydantic model was defined with three fields:
 
@@ -415,7 +418,7 @@ All 5 outputs parsed into `PlannerOutput` objects without any parsing errors, co
 
 ---
 
-#### Question 19 — Why Structured Output Matters *(5 pts)*
+#### Question 19: Why Structured Output Matters 
 
 In large-scale data mining pipelines, many components must be orchestrated automatically over thousands of tasks. If the LLM produces free-form text, every downstream step requires brittle string parsing and ad-hoc heuristics, and small phrasing changes can silently break the pipeline or cause wrong actions.
 
@@ -426,9 +429,9 @@ In large-scale data mining pipelines, many components must be orchestrated autom
 
 ---
 
-### Task 3 — ReAct Data Analysis Agent
+### Task 3: ReAct Data Analysis Agent
 
-#### Question 20 — ReAct Agent Results on 10 Tasks *(30 pts)*
+#### Question 20: ReAct Agent Results on 10 Tasks 
 
 **Agent Architecture (4 components):**
 
@@ -447,38 +450,38 @@ The loop runs for at most 5 iterations per question with error-recovery: if exec
 
 ---
 
-**Qualitative Trace 1 — Question ID 0 (Success with Hallucination Guard)**
+**Qualitative Trace 1: Question ID 0 (Success with Hallucination Guard)**
 
-- **Task:** Compute mean fare in `test_ave.csv` → `@mean_fare[mean_fare_value]`  
+- **Task:** Compute mean fare in `test_ave.csv` tp `@mean_fare[mean_fare_value]`  
 - **Step 1:** Planner asks Coder to load the CSV and compute the mean fare.  
-- **Code:** `mean_fare = df["Fare"].mean()` → prints `RESULT mean_fare = 34.65`  
-- **Issue:** The Coder also printed `FINAL_ANSWER: @mean_fare[8.75]` — a hallucinated/stale value.  
+- **Code:** `mean_fare = df["Fare"].mean()` to print `RESULT mean_fare = 34.65`  
+- **Issue:** The Coder also printed `FINAL_ANSWER: @mean_fare[8.75]` a hallucinated/stale value.  
 - **Agent behavior:** The agent's "use env-computed values" guardrail overrode the hallucinated print and returned `@mean_fare[34.65]` from the actual computed variable.  
-- **Marked: Correct ✅**
+- **Marked: Correct**
 
-> **Key insight:** This illustrates a common failure mode of LLM tool agents — the model can compute correctly but still emit an incorrect final line. Tying the final answer to computed variables (rather than raw generated text) makes the agent reliably safe against this type of hallucination.
+> **Key insight:** This illustrates a common failure mode of LLM tool agents; the model can compute correctly but still emit an incorrect final line. Tying the final answer to computed variables (rather than raw generated text) makes the agent reliably safe against this type of hallucination.
 
 ---
 
-**Qualitative Trace 2 — Question ID 10 (Error Recovery)**
+**Qualitative Trace 2: Question ID 10 (Error Recovery)**
 
 - **Task:** Check if "Total Traded Quantity" in `GODREJIND.csv` is normally distributed → `@is_normal[yes/no]`  
-- **Step 1:** Coder ran a Shapiro-Wilk test and printed `RESULT is_normal = no` but also printed `FINAL_ANSWER: @is_normal[yes]` — contradictory outputs.  
+- **Step 1:** Coder ran a Shapiro-Wilk test and printed `RESULT is_normal = no` but also printed `FINAL_ANSWER: @is_normal[yes]` contradictory outputs.  
 - **Agent behavior:** The guardrail rejected the printed final answer because the slot variable was inconsistently set.  
 - **Step 2:** Coder reran a clean implementation and printed `RESULT is_normal = no` followed by `FINAL_ANSWER: @is_normal[no]`.  
-- **Marked: Correct ✅**
+- **Marked: Correct**
 
 > **Key insight:** The agent handles "messy" intermediate outputs (contradictory lines) and recovers by running a cleaner computation. This demonstrates the value of multi-step error-recovery loops over single-shot generation.
 
 ---
 
-**Qualitative Trace 3 — Question ID 55 (Format Mismatch Failure)**
+**Qualitative Trace 3: Question ID 55 (Format Mismatch Failure)**
 
-- **Task:** Compute mean number of cases across all countries/years in `estimated_numbers.csv` → `@mean_cases[mean_value]` (expected as positive integer)  
+- **Task:** Compute mean number of cases across all countries/years in `estimated_numbers.csv`to `@mean_cases[mean_value]` (expected as positive integer)  
 - **Step 1:** `KeyError: 'Cases'`  
 - **Step 2 (recovery):** Agent printed column names, found correct column `"No. of cases"`.  
-- **Step 3:** Computed `pd.to_numeric(df["No. of cases"], errors="coerce").mean()` → 2199.55  
-- **Output:** `@mean_cases[2199.55]` → marked **Incorrect ❌** because the required format expects an integer (e.g., `@mean_cases[2199]`).
+- **Step 3:** Computed `pd.to_numeric(df["No. of cases"], errors="coerce").mean()` = 2199.55  
+- **Output:** `@mean_cases[2199.55]` → marked **Incorrect** because the required format expects an integer (e.g., `@mean_cases[2199]`).
 
 > **Key insight:** Even when the agent correctly computes the target statistic, strict formatting constraints (float vs. integer) can cause an otherwise correct answer to fail evaluation. This highlights the importance of type-aware final output formatting when the benchmark specifies the answer type.
 
@@ -486,11 +489,11 @@ The loop runs for at most 5 iterations per question with error-recovery: if exec
 
 ---
 
-## Part C — Regression Analysis on Diamonds Dataset
+## Part C: Regression Analysis on Diamonds Dataset
 
 ---
 
-### Question 21 — Exploratory Data Analysis *(15 pts)*
+### Question 21: Exploratory Data Analysis 
 
 #### Correlation Analysis
 
@@ -516,7 +519,7 @@ Skewness values (sorted by absolute value):
 
 | Feature | Skewness |
 |---|---|
-| `depth` | +27.49 (extreme — likely outliers/data issues) |
+| `depth` | +27.49 (extreme likely outliers/data issues) |
 | `depth_percent` | −13.56 |
 | `table_percent` | −11.05 |
 | `width` | +4.12 |
@@ -545,15 +548,15 @@ Box plots of `cut`, `color`, `clarity`, `symmetry`, and `polish` vs. `price` sho
 
 ---
 
-### Question 22 — Categorical Encoding *(10 pts)*
+### Question 22: Categorical Encoding *(10 pts)*
 
 #### Encoding choices
 
 | Feature | Method | Reason |
 |---|---|---|
-| `cut` | Ordinal (scalar) | Only 2 categories with a clear quality order: Very Good < Excellent → {0, 1} |
-| `color` | Ordinal (scalar) | Industry-standard ordered grades M < L < … < D → mapped to 0–9 (higher = better) |
-| `clarity` | Ordinal (scalar) | Industry-standard ordered grades I3 < … < IF → mapped to 0–9 (higher = better) |
+| `cut` | Ordinal (scalar) | Only 2 categories with a clear quality order: Very Good < Excellent -> {0, 1} |
+| `color` | Ordinal (scalar) | Industry-standard ordered grades M < L < … < D -> mapped to 0–9 (higher = better) |
+| `clarity` | Ordinal (scalar) | Industry-standard ordered grades I3 < … < IF -> mapped to 0–9 (higher = better) |
 | `symmetry`, `polish`, `girdle_min`, `girdle_max` | One-hot | No reliable linear ordering; one-hot avoids injecting incorrect numeric structure |
 
 After encoding, the dataset shape became `(149871, 34)` with no missing values introduced.
@@ -563,18 +566,18 @@ After encoding, the dataset shape became `(149871, 34)` with no missing values i
 #### Trade-off Discussion
 
 **What does one-hot encoding discard?**  
-One-hot encoding discards any notion of **ordering** and **distance** between categories. For variables like `color` or `clarity`, it cannot represent that "D is better than E, which is better than F" — all categories are treated as equally unrelated labels. The model cannot directly learn a monotonic quality effect from the encoding alone.
+One-hot encoding discards any notion of **ordering** and **distance** between categories. For variables like `color` or `clarity`, it cannot represent that "D is better than E, which is better than F": all categories are treated as equally unrelated labels. The model cannot directly learn a monotonic quality effect from the encoding alone.
 
 **What assumption must hold strongly for scalar (ordinal) encoding?**  
 Scalar encoding assumes:  
 1. The categories have a **meaningful, consistent order**, and  
 2. The effect on the target is **monotonic** in that order, and ideally **approximately linear** in the encoded integers (each integer step represents a roughly equal increment in the target relationship).  
 
-If these assumptions do not hold, scalar encoding can mislead models — particularly linear regression — by imposing artificial and incorrect spacing between categories.
+If these assumptions do not hold, scalar encoding can mislead models. particularly linear regression by imposing artificial and incorrect spacing between categories.
 
 ---
 
-### Question 23 — Feature Standardization *(5 pts)*
+### Question 23: Feature Standardization
 
 All numeric features were standardized to zero mean and unit variance using `sklearn.preprocessing.StandardScaler`. Categorical features were already encoded.
 
@@ -586,7 +589,7 @@ The standardized dataset (features scaled, `price` preserved in original units) 
 
 ---
 
-### Question 24 — Feature Selection *(10 pts)*
+### Question 24: Feature Selection 
 
 Top 5 features by each method, applied to the encoded (pre-standardization) dataset:
 
@@ -594,23 +597,23 @@ Top 5 features by each method, applied to the encoded (pre-standardization) data
 
 | Rank | Feature | MI Score |
 |---|---|---|
-| 1 | `carat` | highest |
-| 2 | `width` | — |
-| 3 | `length` | — |
-| 4 | `depth` | — |
-| 5 | `color` | — |
+| 1 | `carat` | highest (1.38) |
+| 2 | `width` | 1.20 |
+| 3 | `length` | 1.19 |
+| 4 | `depth` | 1.16 |
+| 5 | `color` | 0.18 |
 
 #### F-Regression (linear association)
 
 | Rank | Feature | F-Score |
 |---|---|---|
-| 1 | `carat` | highest |
-| 2 | `length` | — |
-| 3 | `width` | — |
-| 4 | `depth` | — |
-| 5 | `polish_Excellent` | — |
+| 1 | `carat` | highest (755380) |
+| 2 | `length` | 464517 |
+| 3 | `width` | 364744 |
+| 4 | `depth` | 14789 |
+| 5 | `polish_VeryGood` | 453 |
 
-**Interpretation:** Both methods agree that size-related variables (`carat`, `length`, `width`, `depth`) dominate price prediction. Mutual information additionally ranks `color` highly, reflecting nonlinear or interaction effects not captured by linear F-tests. F-regression highlights the one-hot `polish_Excellent` indicator as the top categorical feature under a linear association test.
+**Interpretation:** Both methods agree that size-related variables (`carat`, `length`, `width`, `depth`) dominate price prediction. Mutual information additionally ranks `color` highly, reflecting nonlinear or interaction effects not captured by linear F-tests. F-regression highlights the one-hot `polish_VeryGood` indicator as the top categorical feature under a linear association test.
 
 **Agentic integration (ReAct agent, diamond questions 0 & 1):**  
 The agent correctly loaded `diamonds_standardized.csv`, computed both MI and F-regression scores, and returned:  
@@ -619,7 +622,7 @@ The agent correctly loaded `diamonds_standardized.csv`, computed both MI and F-r
 
 ---
 
-### Question 25 — Linear Regression Models and Agentic Integration *(15 pts)*
+### Question 25: Linear Regression Models and Agentic Integration 
 
 #### Manual Regression Results (10-Fold Cross-Validation on `diamonds_selected.csv`)
 
@@ -682,7 +685,7 @@ The `statsmodels.OLS` p-values test H₀: coefficient = 0 (feature has no linear
 | Q3 | Hyperparameter analysis | LoRA rank controls adapter capacity; alpha controls update strength; gradient accumulation simulates large batch |
 | Q4 | LoRA parameter counts | 1.54B total params; 2.18M trainable (0.14%) |
 | Q5 | LoRA SFT 1k examples | **42%** (+5 pp over base) |
-| Q6 | Scaling prediction | Expect +3–7 pp from 1k → 3k; diminishing returns beyond |
+| Q6 | Scaling prediction | Expect +3–7 pp from 1k tp 3k; diminishing returns beyond |
 | Q7 | LoRA SFT 3k examples | **46–52%** (varies by run) |
 | Q8 | Failure-case comparison | SFT fixed Example 2; improved Example 1 (still slightly wrong); logic correct but extraction failed on Example 3 |
 | Q9 | Error patterns after SFT | Arithmetic errors, multi-step drift, extraction inconsistencies persist |
