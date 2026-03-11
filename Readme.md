@@ -8,7 +8,6 @@
 ## Part A: Fine-Tuning Language Models for Mathematical Reasoning (GSM8K)
 
 ---
-gt p
 ### Task 1: Baseline: How Good is the Base Model?
 
 
